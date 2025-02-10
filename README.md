@@ -10,3 +10,10 @@
      
 ## 3. Run docker compose and test:
     curl -X POST -H "Accept:application/json" -H "Content-Type:application/json" localhost:8083/connectors/ -d @register-mysql.json
+
+
+### Note: Enable CDC in MySQL to read binlog (Required for user of debezium)
+    SET GLOBAL binlog_format = 'ROW';
+    SET GLOBAL binlog_row_image = 'FULL';
+    GRANT SELECT, RELOAD, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'debezium'@'%';
+    FLUSH PRIVILEGES;
