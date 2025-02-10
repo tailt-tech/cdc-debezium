@@ -1,0 +1,91 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: demo_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+    networks:
+      - debezium-network
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: demo_kafka
+    ports:
+      - "9092:9092"
+    links:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+    networks:
+      - debezium-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: demo_kafka-ui
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS: kafka:9092
+    ports:
+      - "9089:8080"
+    links:
+      - kafka
+    depends_on:
+      - kafka
+    networks:
+      - debezium-network
+
+  mysql:
+    image: mysql:8.0.28
+    container_name: demo_mysql_container
+    environment:
+      MYSQL_ROOT_PASSWORD: debezium
+      MYSQL_USER: debezium
+      MYSQL_PASSWORD: debezium
+      MYSQL_DATABASE: inventory
+    ports:
+      - "30306:3306"
+    command:
+      --default-authentication-plugin=mysql_native_password
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - debezium-network
+
+  connect:
+    image: debezium/connect:3.0.0.Final
+    container_name: demo_connect
+    ports:
+      - "8083:8083"
+    links:
+      - kafka
+      - mysql
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: connect-configs
+      OFFSET_STORAGE_TOPIC: connect-offsets
+      STATUS_STORAGE_TOPIC: connect-status
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_LOG4J_ROOT_LOGLEVEL: INFO
+      CONNECT_PLUGIN_PATH: /kafka/connect
+    volumes:
+      - ./plugins:/kafka/connect
+    networks:
+      - debezium-network
+
+volumes:
+  mysql-data:
+networks:
+  debezium-network:
+    driver: bridge
